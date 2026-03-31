@@ -1,0 +1,68 @@
+/* WeGame AI Studio - Templates Panel */
+:host { display: flex; flex-direction: column; height: 100%; background: #1a1a2e; color: #e0e0e0; font-family: system-ui, -apple-system, sans-serif; }
+#app { display: flex; flex-direction: column; height: 100%; overflow-y: auto; }
+
+.templates-container { padding: 16px; }
+
+/* Header */
+.tpl-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.tpl-header .logo { font-size: 22px; }
+.tpl-header .title { font-size: 16px; font-weight: 600; color: #fff; }
+
+/* Category tabs */
+.category-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+.tab-btn { padding: 6px 14px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: #aaa; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+.tab-btn.active { background: rgba(139,92,246,0.15); border-color: rgba(139,92,246,0.4); color: #c4b5fd; }
+.tab-btn:hover { background: rgba(255,255,255,0.08); }
+
+/* Template grid */
+.template-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.template-card { display: flex; gap: 14px; padding: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; cursor: pointer; transition: all 0.2s; }
+.template-card:hover { background: rgba(139,92,246,0.06); border-color: rgba(139,92,246,0.2); transform: translateY(-1px); }
+.card-icon { font-size: 32px; display: flex; align-items: center; flex-shrink: 0; }
+.card-info h3 { font-size: 14px; font-weight: 600; color: #fff; margin: 0 0 4px; }
+.card-info p { font-size: 12px; color: #888; margin: 0 0 8px; line-height: 1.4; }
+.card-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.tag { padding: 2px 8px; border-radius: 4px; background: rgba(255,255,255,0.06); color: #999; font-size: 10px; }
+
+/* Template detail */
+.template-detail { animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.btn-back { background: none; border: none; color: #8b5cf6; font-size: 12px; cursor: pointer; padding: 0; margin-bottom: 16px; }
+.btn-back:hover { text-decoration: underline; }
+.detail-header { display: flex; gap: 14px; align-items: center; margin-bottom: 20px; }
+.detail-icon { font-size: 40px; }
+.detail-header h2 { font-size: 18px; font-weight: 700; color: #fff; margin: 0 0 4px; }
+.detail-header p { font-size: 12px; color: #888; margin: 0; }
+
+.detail-section { margin-bottom: 16px; }
+.detail-section h3 { font-size: 13px; font-weight: 600; color: #c4b5fd; margin: 0 0 8px; }
+
+/* Scene tree */
+.structure-tree { background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px; font-family: 'SF Mono', monospace; font-size: 12px; }
+.tree-node { padding: 2px 0; }
+.tree-children { margin-left: 18px; border-left: 1px solid rgba(255,255,255,0.08); padding-left: 10px; }
+.node-name { color: #e0e0e0; }
+
+/* Asset list */
+.asset-list { display: flex; flex-direction: column; gap: 6px; }
+.asset-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: 6px; font-size: 12px; }
+.asset-type { padding: 2px 6px; border-radius: 4px; background: rgba(139,92,246,0.15); color: #a78bfa; font-size: 10px; font-weight: 500; }
+.asset-desc { color: #ccc; flex: 1; }
+.asset-optional { font-size: 10px; color: #666; }
+
+/* Script list */
+.script-list { display: flex; flex-direction: column; gap: 6px; }
+.script-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: 6px; font-size: 12px; }
+.script-name { color: #4ade80; font-weight: 500; font-family: 'SF Mono', monospace; }
+.script-desc { color: #888; }
+
+/* Create section */
+.create-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); }
+.input-game-name { width: 100%; box-sizing: border-box; padding: 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #e0e0e0; font-size: 13px; font-family: inherit; outline: none; margin-bottom: 10px; transition: border-color 0.2s; }
+.input-game-name:focus { border-color: rgba(139,92,246,0.5); }
+.input-game-name::placeholder { color: #555; }
+.btn-create { width: 100%; padding: 12px; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+.btn-create:disabled { opacity: 0.4; cursor: default; }
+.btn-create:hover:not(:disabled) { opacity: 0.85; }
+.create-result { margin-top: 10px; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.04); font-size: 12px; line-height: 1.5; }

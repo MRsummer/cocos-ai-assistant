@@ -1,0 +1,112 @@
+<div class="templates-container">
+  <!-- Header -->
+  <div class="tpl-header">
+    <span class="logo">📦</span>
+    <span class="title">游戏模板</span>
+  </div>
+
+  <!-- Category tabs -->
+  <div class="category-tabs">
+    <button
+      v-for="cat in categories"
+      :key="cat.id"
+      class="tab-btn"
+      :class="{ active: selectedCategory === cat.id }"
+      @click="selectedCategory = cat.id"
+    >
+      {{ cat.name }}
+    </button>
+  </div>
+
+  <!-- Template grid (when no template selected) -->
+  <div v-if="!selectedTemplate" class="template-grid">
+    <div
+      v-for="tpl in filteredTemplates"
+      :key="tpl.id"
+      class="template-card"
+      @click="selectTemplate(tpl)"
+    >
+      <div class="card-icon">{{ tpl.icon }}</div>
+      <div class="card-info">
+        <h3>{{ tpl.name }}</h3>
+        <p>{{ tpl.description }}</p>
+        <div class="card-tags">
+          <span v-for="tag in tpl.tags" :key="tag" class="tag">{{ tag }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Template detail (when selected) -->
+  <div v-if="selectedTemplate" class="template-detail">
+    <button class="btn-back" @click="closeDetail">← 返回列表</button>
+
+    <div class="detail-header">
+      <span class="detail-icon">{{ selectedTemplate.icon }}</span>
+      <div>
+        <h2>{{ selectedTemplate.name }}</h2>
+        <p>{{ selectedTemplate.description }}</p>
+      </div>
+    </div>
+
+    <!-- Scene structure preview -->
+    <div class="detail-section">
+      <h3>📐 场景结构</h3>
+      <div class="structure-tree">
+        <div v-for="(node, i) in selectedTemplate.sceneStructure" :key="i" class="tree-node">
+          <span class="node-name">📁 {{ node.name }}</span>
+          <div v-if="node.children" class="tree-children">
+            <div v-for="(child, j) in node.children" :key="j" class="tree-node">
+              <span class="node-name">📄 {{ child.name }}</span>
+              <div v-if="child.children" class="tree-children">
+                <div v-for="(gc, k) in child.children" :key="k" class="tree-node">
+                  <span class="node-name">📄 {{ gc.name }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Required assets -->
+    <div class="detail-section">
+      <h3>🎨 需要的素材</h3>
+      <div class="asset-list">
+        <div v-for="asset in selectedTemplate.requiredAssets" :key="asset.name" class="asset-item">
+          <span class="asset-type">{{ asset.type }}</span>
+          <span class="asset-desc">{{ asset.description }}</span>
+          <span v-if="asset.optional" class="asset-optional">可选</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scripts -->
+    <div v-if="selectedTemplate.scripts && selectedTemplate.scripts.length > 0" class="detail-section">
+      <h3>📝 包含脚本</h3>
+      <div class="script-list">
+        <div v-for="script in selectedTemplate.scripts" :key="script.name" class="script-item">
+          <span class="script-name">{{ script.name }}</span>
+          <span class="script-desc">{{ script.description }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Create section -->
+    <div class="create-section">
+      <input
+        v-model="gameName"
+        class="input-game-name"
+        placeholder="输入游戏名称..."
+      />
+      <button
+        class="btn-create"
+        :disabled="isCreating"
+        @click="createGame"
+      >
+        {{ isCreating ? '创建中...' : '🚀 一键创建游戏' }}
+      </button>
+      <div v-if="createResult" class="create-result" v-html="createResult"></div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,76 @@
+<div class="asset-studio-container">
+  <!-- Header -->
+  <div class="studio-header">
+    <span class="logo">🎨</span>
+    <span class="title">素材工坊</span>
+  </div>
+
+  <!-- Preset selector -->
+  <div class="preset-bar">
+    <button
+      v-for="p in presets"
+      :key="p.id"
+      class="preset-btn"
+      :class="{ active: selectedPreset === p.id }"
+      @click="selectedPreset = p.id"
+    >
+      {{ p.name }}
+    </button>
+  </div>
+
+  <!-- Generation form -->
+  <div class="gen-form">
+    <textarea
+      v-model="promptText"
+      placeholder="描述你想要的游戏素材，例如：一个蓝色的小骑士角色，Q版风格..."
+      rows="3"
+      :disabled="isGenerating"
+    ></textarea>
+    <div class="form-actions">
+      <label class="checkbox-label">
+        <input type="checkbox" v-model="importToProject" />
+        <span>自动导入项目</span>
+      </label>
+      <button
+        class="btn-generate"
+        :disabled="!promptText.trim() || isGenerating"
+        @click="generateImage"
+      >
+        {{ isGenerating ? '生成中...' : '✨ 生成素材' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div v-if="previewImage" class="preview-section">
+    <h3>生成预览</h3>
+    <div class="preview-card">
+      <img :src="previewImage" alt="Generated asset" />
+    </div>
+  </div>
+
+  <!-- Generated assets gallery -->
+  <div v-if="generatedAssets.length > 0" class="gallery-section">
+    <h3>已生成素材 ({{ generatedAssets.length }})</h3>
+    <div class="gallery-grid">
+      <div
+        v-for="(asset, index) in generatedAssets"
+        :key="index"
+        class="gallery-item"
+      >
+        <img :src="asset.preview" :alt="asset.name" />
+        <div class="gallery-item-info">
+          <span class="gallery-item-name">{{ asset.prompt.substring(0, 20) }}...</span>
+          <button class="btn-delete" @click="deleteAsset(index)">✕</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div v-if="generatedAssets.length === 0 && !previewImage" class="empty-state">
+    <div class="empty-icon">🖼️</div>
+    <p>描述需求，AI 为你生成游戏素材</p>
+    <p class="hint">支持角色、场景、UI图标、纹理等</p>
+  </div>
+</div>
