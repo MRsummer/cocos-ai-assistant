@@ -136,6 +136,9 @@
             },
             "ai-generate-canvas-sprite": {
                 "methods": ["aiGenerateCanvasSprite"]
+            },
+            "ai-get-status": {
+                "methods": ["aiGetStatus"]
             }
         },
         "scene": {

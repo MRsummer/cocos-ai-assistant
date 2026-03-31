@@ -14,6 +14,10 @@ let aiImage: AIImageService;
 let canvasSprites: CanvasSpriteGenerator;
 let gameTemplates: GameTemplateService;
 
+// Shared AI status for panel polling
+let currentAiStatus: { type: string; message: string; data?: any; timestamp: number } | null = null;
+let aiStatusHistory: { type: string; message: string; data?: any; timestamp: number }[] = [];
+
 /**
  * Extension main process methods
  */
@@ -82,17 +86,39 @@ export const methods: { [key: string]: (...any: any) => any } = {
     // ─── AI Chat ──────────────────────────────────────────
     async aiChat(message: string) {
         try {
-            // Collect status updates to return
+            // Reset status tracking
+            aiStatusHistory = [];
+            currentAiStatus = null;
+
             const updates: any[] = [];
             const result = await aiChat.chat(message, (status) => {
-                updates.push(status);
-                // Also broadcast to panel for real-time updates
-                Editor.Message.broadcast('cocos-ai-assistant:ai-status', status);
+                const entry = { ...status, timestamp: Date.now() };
+                updates.push(entry);
+                currentAiStatus = entry;
+                aiStatusHistory.push(entry);
+
+                // Also try broadcast (may or may not reach panel)
+                try {
+                    Editor.Message.broadcast('cocos-ai-assistant:ai-status', status);
+                } catch {}
             });
+
+            // Mark as done
+            currentAiStatus = { type: 'done', message: '完成', timestamp: Date.now() };
+
             return { success: true, result, updates };
         } catch (error: any) {
+            currentAiStatus = { type: 'error', message: error.message, timestamp: Date.now() };
             return { success: false, error: error.message };
         }
+    },
+
+    // Polling endpoint for panel to get real-time AI status
+    aiGetStatus() {
+        return {
+            current: currentAiStatus,
+            history: aiStatusHistory,
+        };
     },
 
     aiChatStop() {
