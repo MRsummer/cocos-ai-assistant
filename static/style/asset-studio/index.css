@@ -1,13 +1,19 @@
-/* WeGame AI Studio - Asset Studio Panel */
+/* Cocos AI Assistant - Asset Studio Panel */
 :host { display: flex; flex-direction: column; height: 100%; background: #1a1a2e; color: #e0e0e0; font-family: system-ui, -apple-system, sans-serif; }
 #app { display: flex; flex-direction: column; height: 100%; overflow-y: auto; }
 
 .asset-studio-container { padding: 16px; }
 
 /* Header */
-.studio-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.studio-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .studio-header .logo { font-size: 22px; }
 .studio-header .title { font-size: 16px; font-weight: 600; color: #fff; }
+
+/* Mode tabs */
+.mode-tabs { display: flex; gap: 4px; margin-bottom: 16px; background: rgba(255,255,255,0.03); border-radius: 10px; padding: 3px; }
+.mode-tab { flex: 1; padding: 8px 12px; border-radius: 8px; background: transparent; border: none; color: #888; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+.mode-tab.active { background: rgba(139,92,246,0.15); color: #c4b5fd; }
+.mode-tab:hover:not(.active) { color: #bbb; }
 
 /* Preset bar */
 .preset-bar { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -16,14 +22,15 @@
 .preset-btn:hover { background: rgba(255,255,255,0.08); }
 
 /* Form */
-.gen-form { margin-bottom: 16px; }
+.gen-form { margin-bottom: 12px; }
+.form-label { display: block; font-size: 12px; font-weight: 600; color: #ccc; margin-bottom: 6px; }
 .gen-form textarea { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #e0e0e0; font-size: 13px; font-family: inherit; padding: 10px 12px; resize: none; outline: none; transition: border-color 0.2s; }
 .gen-form textarea:focus { border-color: rgba(139,92,246,0.5); }
 .gen-form textarea::placeholder { color: #555; }
 .form-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
 .checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #888; cursor: pointer; }
 .checkbox-label input { accent-color: #8b5cf6; }
-.btn-generate { padding: 8px 20px; border-radius: 8px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; transition: opacity 0.2s; }
+.btn-generate { padding: 8px 20px; border-radius: 8px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; transition: opacity 0.2s; white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
 .btn-generate:disabled { opacity: 0.4; cursor: default; }
 .btn-generate:hover:not(:disabled) { opacity: 0.85; }
 
@@ -49,3 +56,44 @@
 .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
 .empty-state p { font-size: 13px; color: #666; margin: 0; }
 .empty-state .hint { font-size: 11px; color: #555; margin-top: 6px; }
+
+/* ─── Canvas Sprite Styles ─── */
+
+/* Sprite list */
+.sprite-list-section { margin-bottom: 8px; }
+.sprite-list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.sprite-list-header .form-label { margin-bottom: 0; }
+.btn-add-sprite { background: rgba(255,255,255,0.06); border: 1px dashed rgba(255,255,255,0.15); border-radius: 6px; color: #8b5cf6; font-size: 11px; padding: 4px 10px; cursor: pointer; transition: all 0.2s; }
+.btn-add-sprite:hover:not(:disabled) { background: rgba(139,92,246,0.1); border-color: rgba(139,92,246,0.3); }
+.btn-add-sprite:disabled { opacity: 0.4; cursor: default; }
+
+.sprite-entry { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+.sprite-entry-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.sprite-entry-num { font-size: 11px; font-weight: 600; color: #8b5cf6; }
+.sprite-entry-fields { display: flex; flex-direction: column; gap: 6px; }
+.sprite-input { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; color: #e0e0e0; font-size: 12px; font-family: inherit; padding: 6px 10px; outline: none; transition: border-color 0.2s; }
+.sprite-input:focus { border-color: rgba(139,92,246,0.4); }
+.sprite-input::placeholder { color: #555; }
+.sprite-input:disabled { opacity: 0.5; }
+.sprite-input-small { width: 60px; box-sizing: border-box; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; color: #e0e0e0; font-size: 12px; font-family: inherit; padding: 6px 8px; outline: none; text-align: center; }
+.sprite-input-small:focus { border-color: rgba(139,92,246,0.4); }
+.sprite-input-small:disabled { opacity: 0.5; }
+.sprite-entry-row { display: flex; align-items: center; gap: 6px; }
+.sprite-x { color: #555; font-size: 12px; }
+.flex-1 { flex: 1; }
+
+/* Sprite status */
+.sprite-status { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 12px; background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.15); border-radius: 8px; font-size: 12px; color: #c4b5fd; }
+.sprite-status-dot { width: 6px; height: 6px; border-radius: 50%; background: #8b5cf6; animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* Sprite result cards */
+.sprite-result-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+.sprite-result-header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.sprite-result-name { font-size: 13px; font-weight: 600; color: #fff; }
+.sprite-result-desc { font-size: 11px; color: #888; }
+.sprite-result-size { font-size: 10px; color: #666; margin-left: auto; }
+.sprite-frames-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.sprite-frame { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.sprite-frame img { width: 64px; height: 64px; object-fit: contain; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; image-rendering: pixelated; }
+.sprite-frame-label { font-size: 9px; color: #666; }

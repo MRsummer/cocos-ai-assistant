@@ -133,6 +133,9 @@
             },
             "getEnabledTools": {
                 "methods": ["getEnabledTools"]
+            },
+            "ai-generate-canvas-sprite": {
+                "methods": ["aiGenerateCanvasSprite"]
             }
         },
         "scene": {

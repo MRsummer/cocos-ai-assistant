@@ -1,6 +1,7 @@
 import { MCPServer } from './mcp-server';
 import { AIChatEngine } from './ai-chat';
 import { AIImageService, ImageGenRequest } from './ai-image';
+import { CanvasSpriteGenerator, CanvasSpriteRequest } from './canvas-sprite-generator';
 import { GameTemplateService } from './game-templates';
 import { readSettings, saveSettings } from './settings';
 import { MCPServerSettings } from './types';
@@ -10,6 +11,7 @@ let mcpServer: MCPServer | null = null;
 let toolManager: ToolManager;
 let aiChat: AIChatEngine;
 let aiImage: AIImageService;
+let canvasSprites: CanvasSpriteGenerator;
 let gameTemplates: GameTemplateService;
 
 /**
@@ -138,6 +140,18 @@ export const methods: { [key: string]: (...any: any) => any } = {
         return { success: aiImage.deleteGeneratedAsset(fileName) };
     },
 
+    // ─── Canvas Sprite Generation ─────────────────────────
+    async aiGenerateCanvasSprite(request: CanvasSpriteRequest) {
+        try {
+            const result = await canvasSprites.generate(request, (status) => {
+                Editor.Message.broadcast('cocos-ai-assistant:sprite-status', status);
+            });
+            return result;
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    },
+
     // ─── Game Templates ───────────────────────────────────
     getGameTemplates() {
         return {
@@ -222,6 +236,7 @@ export function load() {
     aiChat.setMCPServer(mcpServer);
 
     aiImage = new AIImageService();
+    canvasSprites = new CanvasSpriteGenerator();
     gameTemplates = new GameTemplateService();
 
     // Auto-start MCP server if configured

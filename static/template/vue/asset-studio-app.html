@@ -5,72 +5,193 @@
     <span class="title">素材工坊</span>
   </div>
 
-  <!-- Preset selector -->
-  <div class="preset-bar">
-    <button
-      v-for="p in presets"
-      :key="p.id"
-      class="preset-btn"
-      :class="{ active: selectedPreset === p.id }"
-      @click="selectedPreset = p.id"
-    >
-      {{ p.name }}
-    </button>
+  <!-- Mode tabs -->
+  <div class="mode-tabs">
+    <button class="mode-tab" :class="{ active: mode === 'ai-image' }" @click="mode = 'ai-image'">🖼️ AI 生图</button>
+    <button class="mode-tab" :class="{ active: mode === 'canvas-sprite' }" @click="mode = 'canvas-sprite'">🎮 Canvas 精灵</button>
   </div>
 
-  <!-- Generation form -->
-  <div class="gen-form">
-    <textarea
-      v-model="promptText"
-      placeholder="描述你想要的游戏素材，例如：一个蓝色的小骑士角色，Q版风格..."
-      rows="3"
-      :disabled="isGenerating"
-    ></textarea>
-    <div class="form-actions">
+  <!-- ========== AI Image Mode ========== -->
+  <template v-if="mode === 'ai-image'">
+    <!-- Preset selector -->
+    <div class="preset-bar">
+      <button
+        v-for="p in presets"
+        :key="p.id"
+        class="preset-btn"
+        :class="{ active: selectedPreset === p.id }"
+        @click="selectedPreset = p.id"
+      >
+        {{ p.name }}
+      </button>
+    </div>
+
+    <!-- Generation form -->
+    <div class="gen-form">
+      <textarea
+        v-model="promptText"
+        placeholder="描述你想要的游戏素材，例如：一个蓝色的小骑士角色，Q版风格..."
+        rows="3"
+        :disabled="isGenerating"
+      ></textarea>
+      <div class="form-actions">
+        <label class="checkbox-label">
+          <input type="checkbox" v-model="importToProject" />
+          <span>自动导入项目</span>
+        </label>
+        <button
+          class="btn-generate"
+          :disabled="!promptText.trim() || isGenerating"
+          @click="generateImage"
+        >
+          {{ isGenerating ? '生成中...' : '✨ 生成素材' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div v-if="previewImage" class="preview-section">
+      <h3>生成预览</h3>
+      <div class="preview-card">
+        <img :src="previewImage" alt="Generated asset" />
+      </div>
+    </div>
+
+    <!-- Generated assets gallery -->
+    <div v-if="generatedAssets.length > 0" class="gallery-section">
+      <h3>已生成素材 ({{ generatedAssets.length }})</h3>
+      <div class="gallery-grid">
+        <div
+          v-for="(asset, index) in generatedAssets"
+          :key="index"
+          class="gallery-item"
+        >
+          <img :src="asset.preview" :alt="asset.name" />
+          <div class="gallery-item-info">
+            <span class="gallery-item-name">{{ asset.prompt.substring(0, 20) }}...</span>
+            <button class="btn-delete" @click="deleteAsset(index)">✕</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div v-if="generatedAssets.length === 0 && !previewImage" class="empty-state">
+      <div class="empty-icon">🖼️</div>
+      <p>描述需求，AI 为你生成游戏素材</p>
+      <p class="hint">支持角色、场景、UI图标、纹理等</p>
+    </div>
+  </template>
+
+  <!-- ========== Canvas Sprite Mode ========== -->
+  <template v-if="mode === 'canvas-sprite'">
+    <!-- Style input -->
+    <div class="gen-form">
+      <label class="form-label">🎨 游戏风格</label>
+      <textarea
+        v-model="spriteStyle"
+        placeholder="描述游戏的美术风格，例如：像素风RPG, 16色调色板, 复古风格"
+        rows="2"
+        :disabled="isSpriteGenerating"
+      ></textarea>
+    </div>
+
+    <!-- Sprite list -->
+    <div class="sprite-list-section">
+      <div class="sprite-list-header">
+        <label class="form-label">🧩 精灵列表</label>
+        <button class="btn-add-sprite" @click="addSpriteEntry" :disabled="isSpriteGenerating">+ 添加精灵</button>
+      </div>
+
+      <div v-for="(sprite, index) in spriteEntries" :key="index" class="sprite-entry">
+        <div class="sprite-entry-header">
+          <span class="sprite-entry-num">#{{ index + 1 }}</span>
+          <button class="btn-delete" @click="removeSpriteEntry(index)" :disabled="isSpriteGenerating">✕</button>
+        </div>
+        <div class="sprite-entry-fields">
+          <input
+            v-model="sprite.name"
+            placeholder="英文名称，如 player, enemy-goblin"
+            class="sprite-input"
+            :disabled="isSpriteGenerating"
+          />
+          <input
+            v-model="sprite.description"
+            placeholder="描述外观，如 蓝色骑士，手持长剑"
+            class="sprite-input"
+            :disabled="isSpriteGenerating"
+          />
+          <div class="sprite-entry-row">
+            <input
+              v-model.number="sprite.width"
+              type="number"
+              placeholder="宽"
+              class="sprite-input-small"
+              :disabled="isSpriteGenerating"
+            />
+            <span class="sprite-x">×</span>
+            <input
+              v-model.number="sprite.height"
+              type="number"
+              placeholder="高"
+              class="sprite-input-small"
+              :disabled="isSpriteGenerating"
+            />
+            <input
+              v-model="sprite.actions"
+              placeholder="动作：idle, walk, attack"
+              class="sprite-input flex-1"
+              :disabled="isSpriteGenerating"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generate button -->
+    <div class="form-actions" style="margin-top: 12px;">
       <label class="checkbox-label">
-        <input type="checkbox" v-model="importToProject" />
+        <input type="checkbox" v-model="spriteImportToProject" />
         <span>自动导入项目</span>
       </label>
       <button
         class="btn-generate"
-        :disabled="!promptText.trim() || isGenerating"
-        @click="generateImage"
+        :disabled="!spriteStyle.trim() || spriteEntries.length === 0 || isSpriteGenerating"
+        @click="generateCanvasSprites"
       >
-        {{ isGenerating ? '生成中...' : '✨ 生成素材' }}
+        {{ isSpriteGenerating ? spriteStatusMsg : '🎮 生成精灵' }}
       </button>
     </div>
-  </div>
 
-  <!-- Preview -->
-  <div v-if="previewImage" class="preview-section">
-    <h3>生成预览</h3>
-    <div class="preview-card">
-      <img :src="previewImage" alt="Generated asset" />
+    <!-- Sprite progress -->
+    <div v-if="spriteStatusMsg && isSpriteGenerating" class="sprite-status">
+      <div class="sprite-status-dot"></div>
+      <span>{{ spriteStatusMsg }}</span>
     </div>
-  </div>
 
-  <!-- Generated assets gallery -->
-  <div v-if="generatedAssets.length > 0" class="gallery-section">
-    <h3>已生成素材 ({{ generatedAssets.length }})</h3>
-    <div class="gallery-grid">
-      <div
-        v-for="(asset, index) in generatedAssets"
-        :key="index"
-        class="gallery-item"
-      >
-        <img :src="asset.preview" :alt="asset.name" />
-        <div class="gallery-item-info">
-          <span class="gallery-item-name">{{ asset.prompt.substring(0, 20) }}...</span>
-          <button class="btn-delete" @click="deleteAsset(index)">✕</button>
+    <!-- Generated sprites gallery -->
+    <div v-if="generatedSprites.length > 0" class="gallery-section" style="margin-top: 16px;">
+      <h3>已生成精灵 ({{ generatedSprites.length }})</h3>
+      <div v-for="(sprite, si) in generatedSprites" :key="si" class="sprite-result-card">
+        <div class="sprite-result-header">
+          <span class="sprite-result-name">{{ sprite.name }}</span>
+          <span class="sprite-result-desc">{{ sprite.description }}</span>
+          <span class="sprite-result-size">{{ sprite.width }}×{{ sprite.height }} · {{ sprite.frames }}帧</span>
+        </div>
+        <div class="sprite-frames-row">
+          <div v-for="(img, fi) in sprite.images" :key="fi" class="sprite-frame">
+            <img :src="img.base64" :alt="sprite.name + '-' + img.frame" />
+            <span class="sprite-frame-label">帧 {{ img.frame }}</span>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Empty state -->
-  <div v-if="generatedAssets.length === 0 && !previewImage" class="empty-state">
-    <div class="empty-icon">🖼️</div>
-    <p>描述需求，AI 为你生成游戏素材</p>
-    <p class="hint">支持角色、场景、UI图标、纹理等</p>
-  </div>
+    <!-- Empty state -->
+    <div v-if="generatedSprites.length === 0 && !isSpriteGenerating" class="empty-state">
+      <div class="empty-icon">🎮</div>
+      <p>用 Canvas 2D 生成游戏精灵图</p>
+      <p class="hint">AI 编写绘制代码，自动渲染为 PNG，支持动画帧</p>
+    </div>
+  </template>
 </div>

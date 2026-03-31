@@ -96,6 +96,7 @@ export class ToolManager {
             const { ReferenceImageTools } = require('./reference-image-tools');
             const { AssetAdvancedTools } = require('./asset-advanced-tools');
             const { ValidationTools } = require('./validation-tools');
+            const { CanvasSpriteTools } = require('./canvas-sprite-tools');
 
             // 初始化工具实例
             const tools = {
@@ -112,7 +113,8 @@ export class ToolManager {
                 sceneView: new SceneViewTools(),
                 referenceImage: new ReferenceImageTools(),
                 assetAdvanced: new AssetAdvancedTools(),
-                validation: new ValidationTools()
+                validation: new ValidationTools(),
+                canvasSprite: new CanvasSpriteTools()
             };
 
             // 从每个工具类获取工具列表
