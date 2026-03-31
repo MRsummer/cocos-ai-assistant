@@ -163,11 +163,11 @@ module.exports = Editor.Panel.define({
                     onMounted(() => {
                         loadPresets();
                         // Register broadcast listener for sprite status
-                        Editor.Message.addBroadcastListener('cocos-ai-assistant:sprite-status', spriteStatusHandler);
+                        (Editor.Message as any).addBroadcastListener('cocos-ai-assistant:sprite-status', spriteStatusHandler);
                     });
 
                     onBeforeUnmount(() => {
-                        Editor.Message.removeBroadcastListener('cocos-ai-assistant:sprite-status', spriteStatusHandler);
+                        (Editor.Message as any).removeBroadcastListener('cocos-ai-assistant:sprite-status', spriteStatusHandler);
                     });
 
                     return {
