@@ -277,6 +277,52 @@ export class ProjectTools implements ToolExecutor {
                 }
             },
             {
+                name: 'read_asset',
+                description: 'Read the content of an asset file (script, json, etc). Use this to read existing scripts before modifying them.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        url: {
+                            type: 'string',
+                            description: 'Asset URL (e.g., db://assets/scripts/Player.ts)'
+                        }
+                    },
+                    required: ['url']
+                }
+            },
+            {
+                name: 'patch_asset',
+                description: 'Partially modify an asset file using search/replace. Only changes the matched parts, leaving all other code untouched. ALWAYS use this instead of save_asset when modifying existing files to avoid breaking existing logic.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        url: {
+                            type: 'string',
+                            description: 'Asset URL (e.g., db://assets/scripts/Player.ts)'
+                        },
+                        patches: {
+                            type: 'array',
+                            description: 'Array of search/replace patches to apply',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    search: {
+                                        type: 'string',
+                                        description: 'Exact text to find in the file (must match exactly, including whitespace)'
+                                    },
+                                    replace: {
+                                        type: 'string',
+                                        description: 'Text to replace the search string with'
+                                    }
+                                },
+                                required: ['search', 'replace']
+                            }
+                        }
+                    },
+                    required: ['url', 'patches']
+                }
+            },
+            {
                 name: 'reimport_asset',
                 description: 'Reimport an asset',
                 inputSchema: {
@@ -429,6 +475,10 @@ export class ProjectTools implements ToolExecutor {
                 return await this.deleteAsset(args.url);
             case 'save_asset':
                 return await this.saveAsset(args.url, args.content);
+            case 'read_asset':
+                return await this.readAsset(args.url);
+            case 'patch_asset':
+                return await this.patchAsset(args.url, args.patches);
             case 'reimport_asset':
                 return await this.reimportAsset(args.url);
             case 'query_asset_path':
@@ -876,6 +926,137 @@ export class ProjectTools implements ToolExecutor {
                 resolve({ success: false, error: err.message });
             });
         });
+    }
+
+    private async readAsset(url: string): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            Editor.Message.request('asset-db', 'query-asset-info', url).then(async (info: any) => {
+                if (!info) {
+                    resolve({ success: false, error: `Asset not found: ${url}` });
+                    return;
+                }
+
+                try {
+                    // Get the file system path from the asset URL
+                    const path = require('path');
+                    const fs = require('fs');
+
+                    // Convert db:// URL to file path
+                    let filePath = '';
+                    if (url.startsWith('db://assets/')) {
+                        filePath = path.join(Editor.Project.path, 'assets', url.substring('db://assets/'.length));
+                    } else if (url.startsWith('db://')) {
+                        filePath = path.join(Editor.Project.path, url.substring('db://'.length));
+                    } else {
+                        filePath = url;
+                    }
+
+                    if (!fs.existsSync(filePath)) {
+                        resolve({ success: false, error: `File not found on disk: ${filePath}` });
+                        return;
+                    }
+
+                    const content = fs.readFileSync(filePath, 'utf-8');
+                    const stats = fs.statSync(filePath);
+
+                    resolve({
+                        success: true,
+                        data: {
+                            url: url,
+                            content: content,
+                            size: stats.size,
+                            lines: content.split('\n').length,
+                            message: `Read ${content.length} characters from ${url}`
+                        }
+                    });
+                } catch (e: any) {
+                    resolve({ success: false, error: `Failed to read file: ${e.message}` });
+                }
+            }).catch((err: Error) => {
+                // Fallback: try reading directly from file system
+                try {
+                    const path = require('path');
+                    const fs = require('fs');
+                    let filePath = '';
+                    if (url.startsWith('db://assets/')) {
+                        filePath = path.join(Editor.Project.path, 'assets', url.substring('db://assets/'.length));
+                    } else if (url.startsWith('db://')) {
+                        filePath = path.join(Editor.Project.path, url.substring('db://'.length));
+                    } else {
+                        filePath = url;
+                    }
+
+                    if (fs.existsSync(filePath)) {
+                        const content = fs.readFileSync(filePath, 'utf-8');
+                        resolve({
+                            success: true,
+                            data: {
+                                url: url,
+                                content: content,
+                                size: content.length,
+                                lines: content.split('\n').length,
+                                message: `Read ${content.length} characters from ${url}`
+                            }
+                        });
+                    } else {
+                        resolve({ success: false, error: `Asset not found: ${url}` });
+                    }
+                } catch (e2: any) {
+                    resolve({ success: false, error: err.message });
+                }
+            });
+        });
+    }
+
+    private async patchAsset(url: string, patches: { search: string; replace: string }[]): Promise<ToolResponse> {
+        try {
+            // First read the current content
+            const readResult = await this.readAsset(url);
+            if (!readResult.success || !readResult.data?.content) {
+                return { success: false, error: `Cannot read file: ${readResult.error || 'unknown error'}` };
+            }
+
+            let content = readResult.data.content as string;
+            const appliedPatches: string[] = [];
+            const failedPatches: string[] = [];
+
+            for (let i = 0; i < patches.length; i++) {
+                const patch = patches[i];
+                if (content.includes(patch.search)) {
+                    content = content.replace(patch.search, patch.replace);
+                    appliedPatches.push(`Patch ${i + 1}: replaced "${patch.search.substring(0, 50)}${patch.search.length > 50 ? '...' : ''}"`);
+                } else {
+                    failedPatches.push(`Patch ${i + 1}: search text not found — "${patch.search.substring(0, 80)}${patch.search.length > 80 ? '...' : ''}"`);
+                }
+            }
+
+            if (appliedPatches.length === 0) {
+                return {
+                    success: false,
+                    error: `No patches could be applied. Failed patches:\n${failedPatches.join('\n')}`,
+                };
+            }
+
+            // Write back the modified content
+            const saveResult = await this.saveAsset(url, content);
+            if (!saveResult.success) {
+                return { success: false, error: `Patches computed but failed to save: ${saveResult.error}` };
+            }
+
+            return {
+                success: true,
+                data: {
+                    url: url,
+                    appliedCount: appliedPatches.length,
+                    failedCount: failedPatches.length,
+                    applied: appliedPatches,
+                    failed: failedPatches.length > 0 ? failedPatches : undefined,
+                    message: `Applied ${appliedPatches.length}/${patches.length} patches to ${url}`
+                }
+            };
+        } catch (e: any) {
+            return { success: false, error: `Patch failed: ${e.message}` };
+        }
     }
 
     private async reimportAsset(url: string): Promise<ToolResponse> {
