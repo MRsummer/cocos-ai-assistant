@@ -307,7 +307,7 @@ export class AIChatEngine {
         }
 
         // AI conversation loop - handle tool_use / tool_result cycles
-        let maxIterations = 20; // Safety limit
+        let maxIterations = 50; // Safety limit
         let finalText = '';
 
         while (maxIterations > 0) {
