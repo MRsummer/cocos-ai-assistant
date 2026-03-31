@@ -1008,6 +1008,85 @@ export class ProjectTools implements ToolExecutor {
         });
     }
 
+    /**
+     * Extract function/class/method names from TypeScript/JavaScript code
+     */
+    private extractSymbols(code: string): string[] {
+        const symbols: string[] = [];
+        // Match: class X, function X, X(, export class X, export function X
+        // Also match method definitions: name(...) {
+        const patterns = [
+            /(?:export\s+)?class\s+(\w+)/g,
+            /(?:export\s+)?function\s+(\w+)/g,
+            /(?:async\s+)?(\w+)\s*\([^)]*\)\s*(?::\s*\w+)?\s*\{/g,
+            /@ccclass\s*\(\s*['"](\w+)['"]\s*\)/g,
+        ];
+
+        for (const pattern of patterns) {
+            let match;
+            while ((match = pattern.exec(code)) !== null) {
+                const name = match[1];
+                // Skip common keywords that aren't real symbols
+                if (!['if', 'for', 'while', 'switch', 'catch', 'return', 'new', 'get', 'set'].includes(name)) {
+                    if (!symbols.includes(name)) {
+                        symbols.push(name);
+                    }
+                }
+            }
+        }
+        return symbols;
+    }
+
+    /**
+     * Basic syntax validation for TypeScript/JavaScript
+     */
+    private validateSyntax(code: string): { valid: boolean; errors: string[] } {
+        const errors: string[] = [];
+
+        // Check bracket balance
+        let braces = 0, parens = 0, brackets = 0;
+        let inString = false;
+        let stringChar = '';
+        let inComment = false;
+        let inLineComment = false;
+
+        for (let i = 0; i < code.length; i++) {
+            const ch = code[i];
+            const next = code[i + 1];
+
+            if (inLineComment) {
+                if (ch === '\n') inLineComment = false;
+                continue;
+            }
+            if (inComment) {
+                if (ch === '*' && next === '/') { inComment = false; i++; }
+                continue;
+            }
+            if (inString) {
+                if (ch === '\\') { i++; continue; }
+                if (ch === stringChar) inString = false;
+                continue;
+            }
+
+            if (ch === '/' && next === '/') { inLineComment = true; continue; }
+            if (ch === '/' && next === '*') { inComment = true; continue; }
+            if (ch === '"' || ch === "'" || ch === '`') { inString = true; stringChar = ch; continue; }
+
+            if (ch === '{') braces++;
+            if (ch === '}') braces--;
+            if (ch === '(') parens++;
+            if (ch === ')') parens--;
+            if (ch === '[') brackets++;
+            if (ch === ']') brackets--;
+        }
+
+        if (braces !== 0) errors.push(`Unbalanced braces: ${braces > 0 ? braces + ' unclosed {' : Math.abs(braces) + ' extra }'}`);
+        if (parens !== 0) errors.push(`Unbalanced parentheses: ${parens > 0 ? parens + ' unclosed (' : Math.abs(parens) + ' extra )'}`);
+        if (brackets !== 0) errors.push(`Unbalanced brackets: ${brackets > 0 ? brackets + ' unclosed [' : Math.abs(brackets) + ' extra ]'}`);
+
+        return { valid: errors.length === 0, errors };
+    }
+
     private async patchAsset(url: string, patches: { search: string; replace: string }[]): Promise<ToolResponse> {
         try {
             // First read the current content
@@ -1016,9 +1095,14 @@ export class ProjectTools implements ToolExecutor {
                 return { success: false, error: `Cannot read file: ${readResult.error || 'unknown error'}` };
             }
 
-            let content = readResult.data.content as string;
+            const originalContent = readResult.data.content as string;
+            let content = originalContent;
             const appliedPatches: string[] = [];
             const failedPatches: string[] = [];
+
+            // Record symbols before patching (for .ts/.js files)
+            const isScript = url.endsWith('.ts') || url.endsWith('.js');
+            const symbolsBefore = isScript ? this.extractSymbols(originalContent) : [];
 
             for (let i = 0; i < patches.length; i++) {
                 const patch = patches[i];
@@ -1037,21 +1121,45 @@ export class ProjectTools implements ToolExecutor {
                 };
             }
 
+            // ─── Post-patch validation ───
+            const warnings: string[] = [];
+
+            if (isScript) {
+                // 1. Check for lost symbols (functions/classes that disappeared)
+                const symbolsAfter = this.extractSymbols(content);
+                const lostSymbols = symbolsBefore.filter(s => !symbolsAfter.includes(s));
+                if (lostSymbols.length > 0) {
+                    warnings.push(`⚠️ LOST SYMBOLS after patch: ${lostSymbols.join(', ')}. These functions/classes existed before but are now missing. This likely means the patch broke existing logic. You should fix this immediately.`);
+                }
+
+                // 2. Basic syntax validation
+                const syntaxCheck = this.validateSyntax(content);
+                if (!syntaxCheck.valid) {
+                    warnings.push(`⚠️ SYNTAX ERRORS detected after patch: ${syntaxCheck.errors.join('; ')}. The file may not compile. You should fix this immediately.`);
+                }
+            }
+
             // Write back the modified content
             const saveResult = await this.saveAsset(url, content);
             if (!saveResult.success) {
                 return { success: false, error: `Patches computed but failed to save: ${saveResult.error}` };
             }
 
+            const hasWarnings = warnings.length > 0;
+
             return {
                 success: true,
+                warning: hasWarnings ? warnings.join('\n') : undefined,
                 data: {
                     url: url,
                     appliedCount: appliedPatches.length,
                     failedCount: failedPatches.length,
                     applied: appliedPatches,
                     failed: failedPatches.length > 0 ? failedPatches : undefined,
-                    message: `Applied ${appliedPatches.length}/${patches.length} patches to ${url}`
+                    warnings: hasWarnings ? warnings : undefined,
+                    message: hasWarnings
+                        ? `⚠️ Applied ${appliedPatches.length} patches but VALIDATION WARNINGS found — review and fix immediately`
+                        : `✅ Applied ${appliedPatches.length}/${patches.length} patches to ${url} — validation passed`
                 }
             };
         } catch (e: any) {
