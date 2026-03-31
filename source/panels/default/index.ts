@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs-extra';
 import { join } from 'path';
-import { createApp, App, defineComponent, ref, computed, onMounted, nextTick } from 'vue';
+import { createApp, App, defineComponent, ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 
 const panelDataMap = new WeakMap<any, App>();
 
@@ -24,6 +24,7 @@ module.exports = Editor.Panel.define({
                     const isLoading = ref(false);
                     const statusText = ref('');
                     const serverRunning = ref(false);
+                    const toolSteps = ref<{ name: string; status: string; time: string }[]>([]);
 
                     const quickPrompts = [
                         { icon: '🎮', label: '创建角色', prompt: '帮我在场景中创建一个2D玩家角色节点，添加Sprite和RigidBody2D组件' },
@@ -32,6 +33,58 @@ module.exports = Editor.Panel.define({
                         { icon: '🚀', label: '一键出游戏', prompt: '帮我从零创建一个完整的2D跑酷游戏，包含场景搭建、角色、障碍物和UI' },
                     ];
 
+                    // ─── Listen for real-time AI status broadcasts ───
+                    const aiStatusHandler = (_event: any, status: any) => {
+                        if (!status) return;
+
+                        switch (status.type) {
+                            case 'thinking':
+                                statusText.value = '🧠 AI 正在思考...';
+                                break;
+                            case 'tool_call':
+                                statusText.value = `⚙️ ${status.message}`;
+                                // Add to tool steps log
+                                toolSteps.value.push({
+                                    name: status.data?.name || status.message,
+                                    status: '执行中...',
+                                    time: new Date().toLocaleTimeString(),
+                                });
+                                // Also add to chat as a real-time system message
+                                messages.value.push({
+                                    role: 'system',
+                                    content: `⚙️ ${status.message}`,
+                                    type: 'tool',
+                                });
+                                nextTick(() => scrollToBottom());
+                                break;
+                            case 'tool_result':
+                                statusText.value = `✅ ${status.message}`;
+                                // Update the last tool step
+                                if (toolSteps.value.length > 0) {
+                                    const last = toolSteps.value[toolSteps.value.length - 1];
+                                    last.status = status.data?.isError ? '❌ 失败' : '✅ 完成';
+                                }
+                                // Add result to chat
+                                const icon = status.data?.isError ? '❌' : '✅';
+                                messages.value.push({
+                                    role: 'system',
+                                    content: `${icon} ${status.message}`,
+                                    type: 'tool',
+                                });
+                                nextTick(() => scrollToBottom());
+                                break;
+                            case 'text':
+                                statusText.value = '💬 AI 正在回复...';
+                                break;
+                            case 'done':
+                                statusText.value = '✅ 完成';
+                                break;
+                            case 'error':
+                                statusText.value = `❌ ${status.message}`;
+                                break;
+                        }
+                    };
+
                     const sendMessage = async () => {
                         const text = inputText.value.trim();
                         if (!text || isLoading.value) return;
@@ -39,23 +92,17 @@ module.exports = Editor.Panel.define({
                         messages.value.push({ role: 'user', content: text });
                         inputText.value = '';
                         isLoading.value = true;
-                        statusText.value = '思考中...';
+                        statusText.value = '🧠 AI 正在思考...';
+                        toolSteps.value = [];
+
+                        await nextTick();
+                        scrollToBottom();
 
                         try {
                             const result = await Editor.Message.request('cocos-ai-assistant', 'ai-chat', text);
                             if (result && result.success) {
-                                // Process status updates
-                                if (result.updates) {
-                                    for (const update of result.updates) {
-                                        if (update.type === 'tool_call') {
-                                            messages.value.push({
-                                                role: 'system',
-                                                content: `⚙️ ${update.message}`,
-                                                type: 'tool',
-                                            });
-                                        }
-                                    }
-                                }
+                                // The real-time broadcast already added tool steps to messages
+                                // Just add the final AI response text
                                 if (result.result) {
                                     messages.value.push({ role: 'assistant', content: result.result });
                                 }
@@ -74,6 +121,7 @@ module.exports = Editor.Panel.define({
 
                         isLoading.value = false;
                         statusText.value = '';
+                        toolSteps.value = [];
                         await nextTick();
                         scrollToBottom();
                     };
@@ -94,14 +142,6 @@ module.exports = Editor.Panel.define({
                         statusText.value = '';
                     };
 
-                    const toggleServer = async () => {
-                        if (serverRunning.value) {
-                            await Editor.Message.request('cocos-ai-assistant', 'stop-server');
-                        } else {
-                            await Editor.Message.request('cocos-ai-assistant', 'start-server');
-                        }
-                    };
-
                     const scrollToBottom = () => {
                         const container = document.querySelector('.chat-messages');
                         if (container) {
@@ -117,7 +157,6 @@ module.exports = Editor.Panel.define({
                     };
 
                     const formatMessage = (content: string) => {
-                        // Basic markdown-like formatting
                         return content
                             .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
                             .replace(/`([^`]+)`/g, '<code>$1</code>')
@@ -126,6 +165,9 @@ module.exports = Editor.Panel.define({
                     };
 
                     onMounted(async () => {
+                        // Register broadcast listener for real-time AI status
+                        (Editor.Message as any).addBroadcastListener('cocos-ai-assistant:ai-status', aiStatusHandler);
+
                         // Load chat history
                         try {
                             const historyResult = await Editor.Message.request('cocos-ai-assistant', 'ai-chat-history');
@@ -145,11 +187,15 @@ module.exports = Editor.Panel.define({
                         }, 3000);
                     });
 
+                    onBeforeUnmount(() => {
+                        (Editor.Message as any).removeBroadcastListener('cocos-ai-assistant:ai-status', aiStatusHandler);
+                    });
+
                     return {
                         messages, inputText, isLoading, statusText,
-                        serverRunning, quickPrompts,
+                        serverRunning, quickPrompts, toolSteps,
                         sendMessage, useQuickPrompt, clearChat,
-                        stopGeneration, toggleServer, handleKeyDown,
+                        stopGeneration, handleKeyDown,
                         formatMessage,
                     };
                 },

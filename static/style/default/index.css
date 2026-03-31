@@ -1,4 +1,4 @@
-/* WeGame AI Studio - AI Chat Panel */
+/* Cocos AI Assistant - AI Chat Panel */
 :host { display: flex; flex-direction: column; height: 100%; background: #1a1a2e; color: #e0e0e0; font-family: system-ui, -apple-system, sans-serif; }
 #app { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 
@@ -67,3 +67,10 @@
 .btn-send:disabled { opacity: 0.3; cursor: default; }
 .btn-send:hover:not(:disabled) { opacity: 0.85; }
 .btn-stop { background: #ef4444; }
+
+/* Tool execution steps */
+.tool-steps { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); }
+.tool-step { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 11px; animation: fadeIn 0.15s ease; }
+.tool-step-status { flex-shrink: 0; min-width: 50px; }
+.tool-step-name { color: #a78bfa; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tool-step-time { color: #555; font-size: 10px; flex-shrink: 0; }
