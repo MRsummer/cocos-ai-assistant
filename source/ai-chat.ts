@@ -292,19 +292,17 @@ export class AIChatEngine {
         // Build the tools list
         const tools = this.getToolDefinitions();
 
-        // Gather project context on first message of session (or refresh periodically)
-        if (session.messages.length <= 1) {
-            onStatus?.({ type: 'thinking', message: '正在收集工程上下文...' });
-            try {
-                const context = await this.gatherProjectContext();
-                if (context) {
-                    this.buildSystemPrompt(); // Reset base prompt
-                    this.systemPrompt += context;
-                    console.log(`[AIChatEngine] Injected project context (${context.length} chars)`);
-                }
-            } catch (e: any) {
-                console.log('[AIChatEngine] Failed to gather context:', e.message);
+        // Gather project context every turn (refresh scene hierarchy after AI operations)
+        onStatus?.({ type: 'thinking', message: '正在收集工程上下文...' });
+        try {
+            const context = await this.gatherProjectContext();
+            if (context) {
+                this.buildSystemPrompt(); // Reset base prompt
+                this.systemPrompt += context;
+                console.log(`[AIChatEngine] Injected project context (${context.length} chars)`);
             }
+        } catch (e: any) {
+            console.log('[AIChatEngine] Failed to gather context:', e.message);
         }
 
         // AI conversation loop - handle tool_use / tool_result cycles
@@ -424,15 +422,72 @@ export class AIChatEngine {
     /**
      * Call the Anthropic Messages API via AI Gateway
      */
+    /**
+     * Log LLM request to file for debugging
+     */
+    private logLLMRequest(payload: any): void {
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const logDir = path.join(Editor.Project.path, 'temp', 'ai-logs');
+            if (!fs.existsSync(logDir)) {
+                fs.mkdirSync(logDir, { recursive: true });
+            }
+
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const logFile = path.join(logDir, `request-${timestamp}.json`);
+
+            fs.writeFileSync(logFile, JSON.stringify(payload, null, 2), 'utf-8');
+            console.log(`[AIChatEngine] LLM request logged to ${logFile}`);
+
+            // Also write a latest.json for quick access
+            const latestFile = path.join(logDir, 'latest-request.json');
+            fs.writeFileSync(latestFile, JSON.stringify(payload, null, 2), 'utf-8');
+        } catch (e: any) {
+            console.warn('[AIChatEngine] Failed to log request:', e.message);
+        }
+    }
+
+    /**
+     * Log LLM response to file for debugging
+     */
+    private logLLMResponse(response: any): void {
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const logDir = path.join(Editor.Project.path, 'temp', 'ai-logs');
+            if (!fs.existsSync(logDir)) {
+                fs.mkdirSync(logDir, { recursive: true });
+            }
+
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const logFile = path.join(logDir, `response-${timestamp}.json`);
+
+            fs.writeFileSync(logFile, JSON.stringify(response, null, 2), 'utf-8');
+            console.log(`[AIChatEngine] LLM response logged to ${logFile}`);
+
+            // Also write latest
+            const latestFile = path.join(logDir, 'latest-response.json');
+            fs.writeFileSync(latestFile, JSON.stringify(response, null, 2), 'utf-8');
+        } catch (e: any) {
+            console.warn('[AIChatEngine] Failed to log response:', e.message);
+        }
+    }
+
     private callAnthropicAPI(messages: ChatMessage[], tools: ToolDefinitionForAI[]): Promise<AIResponse> {
         return new Promise((resolve, reject) => {
-            const body = JSON.stringify({
+            const requestPayload = {
                 model: AI_CONFIG.model,
                 max_tokens: AI_CONFIG.maxTokens,
                 system: this.systemPrompt,
                 messages: messages,
                 tools: tools.length > 0 ? tools : undefined,
-            });
+            };
+
+            const body = JSON.stringify(requestPayload);
+
+            // Log full request to file for debugging
+            this.logLLMRequest(requestPayload);
 
             const urlObj = new URL(AI_CONFIG.baseUrl + '/v1/messages');
 
@@ -467,6 +522,8 @@ export class AIChatEngine {
                             reject(new Error(`API Error: ${parsed.error.message || JSON.stringify(parsed.error)}`));
                             return;
                         }
+                        // Log response for debugging
+                        this.logLLMResponse(parsed);
                         resolve(parsed as AIResponse);
                     } catch (e: any) {
                         reject(new Error(`Failed to parse response: ${e.message}`));
