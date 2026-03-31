@@ -1,6 +1,7 @@
 import * as https from 'https';
 import * as http from 'http';
 import { MCPServer } from './mcp-server';
+import { COCOS_REFERENCE } from './cocos-reference';
 
 /**
  * AI Gateway configuration
@@ -171,7 +172,9 @@ export class ClassName extends Component {
 - 下方"当前工程上下文"包含项目目录、场景列表和节点层级，直接参考
 - 创建节点时从上下文中查找父节点 UUID
 - 用户指代"那个按钮"等时，从场景层级推断
-- 使用中文回复，简洁专业`;
+- 使用中文回复，简洁专业
+
+${COCOS_REFERENCE}`;
     }
 
     /**
