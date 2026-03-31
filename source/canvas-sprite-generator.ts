@@ -2,6 +2,7 @@ import * as https from 'https';
 import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 
 /**
  * AI Gateway configuration (shared with ai-chat)
@@ -16,6 +17,27 @@ const AI_CONFIG = {
 
 const MAX_ROUNDS = 5;
 const RENDER_TIMEOUT = 15000; // 15s for electron render
+
+/**
+ * Get a safe temp directory that works in Cocos Creator plugin environment
+ */
+function getSafeTempDir(): string {
+    // Try multiple approaches since os.tmpdir() can fail in some plugin contexts
+    try {
+        const tmp = os.tmpdir();
+        if (tmp) return path.join(tmp, 'cocos-ai-assistant');
+    } catch {}
+
+    // Fallback: use project temp directory
+    try {
+        if (Editor && Editor.Project && Editor.Project.path) {
+            return path.join(Editor.Project.path, 'temp', 'cocos-ai-assistant');
+        }
+    } catch {}
+
+    // Last resort
+    return path.join(process.env.TMPDIR || process.env.TMP || process.env.TEMP || '/tmp', 'cocos-ai-assistant');
+}
 
 /**
  * System prompt for the canvas sprite generation agent
@@ -148,7 +170,7 @@ export class CanvasSpriteGenerator {
             const renderedImages = await this.renderSprites(spriteDefs);
 
             // Step 3: Save to temp and optionally import to project
-            const tempDir = path.join(require('os').tmpdir(), 'cocos-ai-assistant', 'canvas-sprites');
+            const tempDir = path.join(getSafeTempDir(), 'canvas-sprites');
             if (!fs.existsSync(tempDir)) {
                 fs.mkdirSync(tempDir, { recursive: true });
             }
@@ -371,7 +393,7 @@ export class CanvasSpriteGenerator {
                 });
 
                 // Write HTML to temp file
-                const htmlPath = path.join(require('os').tmpdir(), 'cocos-ai-assistant', 'sprite-render.html');
+                const htmlPath = path.join(getSafeTempDir(), 'sprite-render.html');
                 const htmlDir = path.dirname(htmlPath);
                 if (!fs.existsSync(htmlDir)) {
                     fs.mkdirSync(htmlDir, { recursive: true });
