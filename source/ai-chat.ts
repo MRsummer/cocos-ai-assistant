@@ -237,6 +237,7 @@ export class ClassName extends Component {
 - 下方"当前工程上下文"包含项目目录、场景列表和节点层级，直接参考
 - 创建节点时从上下文中查找父节点 UUID
 - 用户指代"那个按钮"等时，从场景层级推断
+- 用户消息中 \`@文件名.ts\` 会自动加载该文件内容，可直接参考
 - 使用中文回复，简洁专业
 - **回复尽量精炼**，不要重复罗列已创建的代码，用户在编辑器里能看到
 
@@ -389,14 +390,90 @@ ${COCOS_REFERENCE}`;
      * Send a message to the AI and process the response
      * Handles the tool_use / tool_result loop automatically
      */
+    /**
+     * Resolve @file references in user message.
+     * When user mentions @PlayerController.ts or @db://assets/scripts/Player.ts,
+     * automatically read the file content and append it to the message.
+     */
+    private async resolveFileReferences(message: string): Promise<string> {
+        // Match @filename patterns: @Player.ts, @GameManager.ts, @db://assets/scripts/xxx.ts
+        const atPattern = /@((?:db:\/\/[^\s,，。！]+)|(?:[A-Za-z0-9_-]+\.(?:ts|js|json|txt|md|prefab|scene|fire)))/g;
+        const matches = [...message.matchAll(atPattern)];
+
+        if (matches.length === 0) return message;
+
+        const fileContents: string[] = [];
+
+        for (const match of matches) {
+            let fileRef = match[1];
+
+            // If it's not a db:// path, search for it in common locations
+            if (!fileRef.startsWith('db://')) {
+                // Try common asset script paths
+                const searchPaths = [
+                    `db://assets/scripts/${fileRef}`,
+                    `db://assets/${fileRef}`,
+                    `db://assets/Scripts/${fileRef}`,
+                ];
+
+                let found = false;
+                for (const searchPath of searchPaths) {
+                    try {
+                        const diskPath = await Editor.Message.request('asset-db', 'query-path', searchPath);
+                        if (diskPath) {
+                            const fs = require('fs');
+                            if (fs.existsSync(diskPath)) {
+                                const content = fs.readFileSync(diskPath, 'utf-8');
+                                fileContents.push(`--- @${fileRef} (${searchPath}) ---\n${content}\n--- end ---`);
+                                found = true;
+                                break;
+                            }
+                        }
+                    } catch {
+                        // Continue searching
+                    }
+                }
+
+                if (!found) {
+                    fileContents.push(`--- @${fileRef}: 文件未找到 ---`);
+                }
+            } else {
+                // Direct db:// path
+                try {
+                    const diskPath = await Editor.Message.request('asset-db', 'query-path', fileRef);
+                    if (diskPath) {
+                        const fs = require('fs');
+                        if (fs.existsSync(diskPath)) {
+                            const content = fs.readFileSync(diskPath, 'utf-8');
+                            fileContents.push(`--- @${fileRef} ---\n${content}\n--- end ---`);
+                        } else {
+                            fileContents.push(`--- @${fileRef}: 文件不存在 ---`);
+                        }
+                    }
+                } catch {
+                    fileContents.push(`--- @${fileRef}: 无法读取 ---`);
+                }
+            }
+        }
+
+        if (fileContents.length > 0) {
+            return message + '\n\n【自动加载的文件内容】\n' + fileContents.join('\n\n');
+        }
+
+        return message;
+    }
+
     public async chat(userMessage: string, onStatus?: StatusCallback): Promise<string> {
         const session = this.getCurrentSession();
         if (!session) {
             throw new Error('No active session');
         }
 
-        // Add user message
-        session.messages.push({ role: 'user', content: userMessage });
+        // Resolve @file references before sending to AI
+        const resolvedMessage = await this.resolveFileReferences(userMessage);
+
+        // Add user message (original for display, resolved goes to AI)
+        session.messages.push({ role: 'user', content: resolvedMessage });
 
         // Update session title from first message
         if (session.messages.length === 1) {
