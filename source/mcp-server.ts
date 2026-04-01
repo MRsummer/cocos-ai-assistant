@@ -17,6 +17,7 @@ import { ReferenceImageTools } from './tools/reference-image-tools';
 import { AssetAdvancedTools } from './tools/asset-advanced-tools';
 import { ValidationTools } from './tools/validation-tools';
 import { BatchTools } from './tools/batch-tools';
+import { CaptureTools } from './tools/capture-tools';
 
 export class MCPServer {
     private settings: MCPServerSettings;
@@ -48,6 +49,7 @@ export class MCPServer {
             this.tools.referenceImage = new ReferenceImageTools();
             this.tools.assetAdvanced = new AssetAdvancedTools();
             this.tools.validation = new ValidationTools();
+            this.tools.capture = new CaptureTools();
             const batchTools = new BatchTools();
             batchTools.setMCPServer(this);
             this.tools.batch = batchTools;
