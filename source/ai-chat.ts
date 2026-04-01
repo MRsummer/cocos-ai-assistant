@@ -117,19 +117,49 @@ export class AIChatEngine {
 
 收到需求后，第一条回复必须是编号步骤计划，格式如下：
 
-1. 创建脚本目录
-2. 创建 GameManager.ts — 游戏状态机和分数管理
-3. 创建 Player.ts — 玩家控制逻辑
-4. 创建 XXX.ts — ...
-5. 搭建场景节点结构（Canvas/GameLayer/UILayer）
-6. 为节点添加组件和属性
-7. 保存场景并验证
+1. 批量生成所有精灵图（角色、敌人、道具、背景、地面等）
+2. 创建脚本目录
+3. 创建 GameManager.ts — 游戏状态机和分数管理
+4. 创建 Player.ts — 玩家控制逻辑
+5. 创建 XXX.ts — ...
+6. 搭建场景节点结构（Canvas/GameLayer/UILayer）
+7. 为节点添加组件、绑定精灵图和属性
+8. 保存场景并验证
 
 要求：
 - 计划必须是简洁的编号列表（1. 2. 3. ...），每步一行
 - 计划输出后，**立即开始按顺序执行**，不需要等用户确认
 - 每个脚本必须是完整的、可运行的代码，不留 TODO 或占位符
 - 全部完成后输出简短的操作指南（按键说明等）
+
+## 🎨 精灵图生成规则（必须遵守）
+
+**所有游戏的可见元素都必须有精灵图，不允许使用纯色方块代替。**
+
+工作流程：
+1. **先规划精灵清单**：列出游戏需要的所有精灵（角色、敌人、道具、背景、地面、UI 图标等）
+2. **一次性批量生成**：调用 \`generate_sprite_canvas\` 时，把所有精灵放在 \`sprites\` 数组中一次传入。**严禁多次调用逐个生成**。
+3. **生成完再搭场景**：精灵全部生成并导入后，再创建场景节点和绑定 SpriteFrame
+
+调用示例：
+\`\`\`json
+{
+  "style": "像素风, 16x16, 复古8bit风格",
+  "sprites": [
+    { "name": "bird", "description": "黄色小鸟，圆形身体，小翅膀", "width": 48, "height": 48 },
+    { "name": "pipe-top", "description": "绿色水管顶部", "width": 64, "height": 320 },
+    { "name": "pipe-bottom", "description": "绿色水管底部", "width": 64, "height": 320 },
+    { "name": "ground", "description": "棕色泥土地面", "width": 360, "height": 64 },
+    { "name": "background", "description": "天蓝色天空带白云", "width": 720, "height": 960 }
+  ],
+  "importToProject": true
+}
+\`\`\`
+
+注意：
+- 每个精灵指定合理的尺寸（不要全用 64x64）
+- style 描述统一的美术风格，让所有精灵风格一致
+- 生成的精灵自动导入到 \`db://assets/ai-sprites/\`，后续用这个路径绑定 SpriteFrame
 
 ### 修改现有游戏时：
 1. **先读后改**：必须先用 \`read_asset\` 读取当前完整内容

@@ -10,7 +10,7 @@ export class CanvasSpriteTools implements ToolExecutor {
         return [
             {
                 name: 'generate_sprite_canvas',
-                description: 'Generate game sprite images using Canvas 2D rendering. An internal AI agent generates Canvas draw functions, then renders them to PNG. Use this when the user needs game sprites (characters, items, enemies, UI elements, etc). Supports multiple sprites with animation frames.',
+                description: '批量生成游戏精灵图。使用 Canvas 2D 渲染，一次调用生成所有需要的精灵。⚠️ 必须把所有精灵放在一次调用中（sprites 数组），严禁多次调用此工具逐个生成。支持角色、敌人、道具、UI元素、背景等各类精灵。',
                 inputSchema: {
                     type: 'object',
                     properties: {
