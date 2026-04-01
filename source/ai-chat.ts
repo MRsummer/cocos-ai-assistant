@@ -9,7 +9,7 @@ import { COCOS_REFERENCE } from './cocos-reference';
 const AI_CONFIG = {
     baseUrl: 'https://ai-gateway.wepieoa.com',
     apiKey: 'sk-f4LMvSSYT6ewJAptLi9WNg',
-    model: 'claude-opus-4-6',
+    model: 'claude-sonnet-4-6',
     maxTokens: 8192,
     anthropicVersion: '2023-06-01',
 };
@@ -613,9 +613,9 @@ ${COCOS_REFERENCE}`;
             });
 
             // Set timeout
-            req.setTimeout(120000, () => {
+            req.setTimeout(300000, () => {
                 req.destroy();
-                reject(new Error('Request timeout (120s)'));
+                reject(new Error('Request timeout (300s)'));
             });
 
             req.write(body);

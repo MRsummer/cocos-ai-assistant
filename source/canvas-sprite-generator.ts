@@ -10,7 +10,7 @@ import * as os from 'os';
 const AI_CONFIG = {
     baseUrl: 'https://ai-gateway.wepieoa.com',
     apiKey: 'sk-f4LMvSSYT6ewJAptLi9WNg',
-    model: 'claude-opus-4-6',
+    model: 'claude-sonnet-4-6',
     maxTokens: 16384,
     anthropicVersion: '2023-06-01',
 };
