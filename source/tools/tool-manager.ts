@@ -97,6 +97,7 @@ export class ToolManager {
             const { AssetAdvancedTools } = require('./asset-advanced-tools');
             const { ValidationTools } = require('./validation-tools');
             const { CanvasSpriteTools } = require('./canvas-sprite-tools');
+            const { BatchTools } = require('./batch-tools');
 
             // 初始化工具实例
             const tools = {
@@ -114,7 +115,8 @@ export class ToolManager {
                 referenceImage: new ReferenceImageTools(),
                 assetAdvanced: new AssetAdvancedTools(),
                 validation: new ValidationTools(),
-                canvasSprite: new CanvasSpriteTools()
+                canvasSprite: new CanvasSpriteTools(),
+                batch: new BatchTools()
             };
 
             // 从每个工具类获取工具列表

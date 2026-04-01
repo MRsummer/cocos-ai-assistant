@@ -16,6 +16,7 @@ import { SceneViewTools } from './tools/scene-view-tools';
 import { ReferenceImageTools } from './tools/reference-image-tools';
 import { AssetAdvancedTools } from './tools/asset-advanced-tools';
 import { ValidationTools } from './tools/validation-tools';
+import { BatchTools } from './tools/batch-tools';
 
 export class MCPServer {
     private settings: MCPServerSettings;
@@ -47,6 +48,9 @@ export class MCPServer {
             this.tools.referenceImage = new ReferenceImageTools();
             this.tools.assetAdvanced = new AssetAdvancedTools();
             this.tools.validation = new ValidationTools();
+            const batchTools = new BatchTools();
+            batchTools.setMCPServer(this);
+            this.tools.batch = batchTools;
             console.log('[MCPServer] Tools initialized successfully');
         } catch (error) {
             console.error('[MCPServer] Error initializing tools:', error);
