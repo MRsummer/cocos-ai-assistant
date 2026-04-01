@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs-extra';
 import { join } from 'path';
-import { createApp, App, defineComponent, ref, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { createApp, App, defineComponent, ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 
 const panelDataMap = new WeakMap<any, App>();
 
@@ -22,24 +22,39 @@ module.exports = Editor.Panel.define({
                     const messages = ref<{ role: string; content: string; type?: string }[]>([]);
                     const inputText = ref('');
                     const isLoading = ref(false);
-                    const statusText = ref('');
                     const serverRunning = ref(false);
-                    const toolSteps = ref<{ name: string; status: string; time: string }[]>([]);
 
-                    // Track which status entries we've already processed
+                    // Progress tracking (replaces individual tool messages)
+                    const progressPhase = ref('🧠 AI 正在思考...');
+                    const progressDetail = ref('');
+                    const completedSteps = ref(0);
+                    const totalSteps = ref(0);
+
+                    const progressPercent = computed(() => {
+                        if (totalSteps.value <= 0) return 0;
+                        return Math.min(100, Math.round((completedSteps.value / totalSteps.value) * 100));
+                    });
+
+                    // Filtered messages: only user + assistant text (no tool/system noise)
+                    const displayMessages = computed(() => {
+                        return messages.value.filter(m => m.role === 'user' || (m.role === 'assistant' && m.type !== 'tool'));
+                    });
+
                     let lastProcessedIndex = 0;
                     let statusPollTimer: any = null;
 
                     const quickPrompts = [
-                        { icon: '🎮', label: '创建角色', prompt: '帮我在场景中创建一个2D玩家角色节点，添加Sprite和RigidBody2D组件' },
-                        { icon: '🏞️', label: '设计场景', prompt: '帮我搭建一个2D横版游戏场景，包含背景、地面和几个平台' },
-                        { icon: '📝', label: '生成脚本', prompt: '帮我分析当前场景结构，然后创建一个玩家控制脚本' },
-                        { icon: '🚀', label: '一键出游戏', prompt: '帮我从零创建一个完整的2D跑酷游戏，包含场景搭建、角色、障碍物和UI' },
+                        { icon: '🐦', label: 'Flappy Bird', prompt: '帮我创建一个完整的 Flappy Bird 游戏' },
+                        { icon: '🏃', label: '跑酷游戏', prompt: '帮我创建一个完整的无尽跑酷游戏' },
+                        { icon: '💎', label: '消除游戏', prompt: '帮我创建一个完整的三消游戏' },
+                        { icon: '🚀', label: '自定义游戏', prompt: '' },
                     ];
 
-                    // ─── Poll for AI status updates ───
+                    // ─── Poll for AI status updates (simplified) ───
                     const startStatusPolling = () => {
                         lastProcessedIndex = 0;
+                        completedSteps.value = 0;
+                        totalSteps.value = 0;
                         stopStatusPolling();
 
                         statusPollTimer = setInterval(async () => {
@@ -49,21 +64,26 @@ module.exports = Editor.Panel.define({
 
                                 const history = result.history as any[];
 
-                                // Process new entries since last poll
+                                // Count completed steps
                                 for (let i = lastProcessedIndex; i < history.length; i++) {
                                     const status = history[i];
-                                    processStatusUpdate(status);
+                                    if (status.type === 'tool_call') {
+                                        totalSteps.value++;
+                                    }
+                                    if (status.type === 'tool_result') {
+                                        completedSteps.value++;
+                                    }
                                 }
                                 lastProcessedIndex = history.length;
 
-                                // Update current status text
+                                // Update progress display from current status
                                 if (result.current) {
-                                    updateStatusText(result.current);
+                                    updateProgress(result.current);
                                 }
                             } catch {
                                 // Ignore polling errors
                             }
-                        }, 500); // Poll every 500ms
+                        }, 500);
                     };
 
                     const stopStatusPolling = () => {
@@ -73,60 +93,72 @@ module.exports = Editor.Panel.define({
                         }
                     };
 
-                    const processStatusUpdate = (status: any) => {
+                    const updateProgress = (status: any) => {
                         switch (status.type) {
-                            case 'tool_call':
-                                toolSteps.value.push({
-                                    name: status.data?.name || status.message,
-                                    status: '⏳ 执行中',
-                                    time: new Date(status.timestamp).toLocaleTimeString(),
-                                });
-                                messages.value.push({
-                                    role: 'system',
-                                    content: `⚙️ ${status.message}`,
-                                    type: 'tool',
-                                });
-                                nextTick(() => scrollToBottom());
+                            case 'thinking':
+                                progressPhase.value = '🧠 AI 正在思考...';
+                                progressDetail.value = '';
                                 break;
-
+                            case 'tool_call':
+                                progressPhase.value = '⚙️ 正在构建游戏';
+                                // Show friendly tool name
+                                progressDetail.value = friendlyToolName(status.data?.name || status.message);
+                                break;
                             case 'tool_result':
-                                // Update the last matching tool step
-                                if (toolSteps.value.length > 0) {
-                                    const last = toolSteps.value[toolSteps.value.length - 1];
-                                    last.status = status.data?.isError ? '❌ 失败' : '✅ 完成';
-                                }
+                                // Keep current phase, just update detail
                                 const icon = status.data?.isError ? '❌' : '✅';
-                                messages.value.push({
-                                    role: 'system',
-                                    content: `${icon} ${status.message}`,
-                                    type: 'tool',
-                                });
-                                nextTick(() => scrollToBottom());
+                                progressDetail.value = `${icon} ${friendlyToolName(status.data?.name || status.message)}`;
+                                break;
+                            case 'text':
+                                progressPhase.value = '💬 AI 正在总结...';
+                                progressDetail.value = '';
+                                break;
+                            case 'done':
+                                progressPhase.value = '✅ 完成';
+                                progressDetail.value = '';
+                                break;
+                            case 'error':
+                                progressPhase.value = '❌ 出错了';
+                                progressDetail.value = status.message;
                                 break;
                         }
                     };
 
-                    const updateStatusText = (status: any) => {
-                        switch (status.type) {
-                            case 'thinking':
-                                statusText.value = '🧠 AI 正在思考...';
-                                break;
-                            case 'tool_call':
-                                statusText.value = `⚙️ ${status.message}`;
-                                break;
-                            case 'tool_result':
-                                statusText.value = `✅ ${status.message}`;
-                                break;
-                            case 'text':
-                                statusText.value = '💬 AI 正在回复...';
-                                break;
-                            case 'done':
-                                statusText.value = '✅ 完成';
-                                break;
-                            case 'error':
-                                statusText.value = `❌ ${status.message}`;
-                                break;
+                    // Map internal tool names to friendly Chinese descriptions
+                    const friendlyToolName = (name: string): string => {
+                        if (!name) return '';
+                        const map: Record<string, string> = {
+                            'scene_get_current_scene': '获取场景信息',
+                            'scene_get_scene_hierarchy': '读取场景层级',
+                            'scene_get_scene_list': '获取场景列表',
+                            'scene_open_scene': '打开场景',
+                            'scene_save_scene': '保存场景',
+                            'node_create_node': '创建节点',
+                            'node_delete_node': '删除节点',
+                            'node_set_property': '设置节点属性',
+                            'node_get_property': '读取节点属性',
+                            'node_move_node': '移动节点',
+                            'component_add_component': '添加组件',
+                            'component_set_component_property': '设置组件属性',
+                            'component_get_component_property': '读取组件属性',
+                            'component_remove_component': '移除组件',
+                            'prefab_create_prefab': '创建预制体',
+                            'prefab_instantiate_prefab': '实例化预制体',
+                            'project_save_asset': '保存文件',
+                            'project_read_asset': '读取文件',
+                            'project_patch_asset': '修改代码',
+                            'project_get_assets': '获取资源列表',
+                            'project_create_directory': '创建目录',
+                            'project_reimport_asset': '重新导入资源',
+                        };
+                        // Check exact match first
+                        if (map[name]) return map[name];
+                        // Try partial match
+                        for (const [key, val] of Object.entries(map)) {
+                            if (name.includes(key)) return val;
                         }
+                        // Fallback: clean up the name
+                        return name.replace(/_/g, ' ').replace(/^正在执行:\s*/, '');
                     };
 
                     const sendMessage = async () => {
@@ -136,13 +168,12 @@ module.exports = Editor.Panel.define({
                         messages.value.push({ role: 'user', content: text });
                         inputText.value = '';
                         isLoading.value = true;
-                        statusText.value = '🧠 AI 正在思考...';
-                        toolSteps.value = [];
+                        progressPhase.value = '🧠 AI 正在思考...';
+                        progressDetail.value = '';
 
                         await nextTick();
                         scrollToBottom();
 
-                        // Start polling for status updates
                         startStatusPolling();
 
                         try {
@@ -164,17 +195,24 @@ module.exports = Editor.Panel.define({
                             });
                         }
 
-                        // Stop polling
                         stopStatusPolling();
 
                         isLoading.value = false;
-                        statusText.value = '';
-                        toolSteps.value = [];
+                        progressPhase.value = '';
+                        progressDetail.value = '';
+                        completedSteps.value = 0;
+                        totalSteps.value = 0;
                         await nextTick();
                         scrollToBottom();
                     };
 
                     const useQuickPrompt = (prompt: string) => {
+                        if (!prompt) {
+                            // "自定义游戏" — just focus the input
+                            const textarea = document.querySelector('.input-wrapper textarea') as HTMLTextAreaElement;
+                            if (textarea) textarea.focus();
+                            return;
+                        }
                         inputText.value = prompt;
                         sendMessage();
                     };
@@ -188,7 +226,8 @@ module.exports = Editor.Panel.define({
                         await Editor.Message.request('cocos-ai-assistant', 'ai-chat-stop');
                         stopStatusPolling();
                         isLoading.value = false;
-                        statusText.value = '';
+                        progressPhase.value = '';
+                        progressDetail.value = '';
                     };
 
                     const scrollToBottom = () => {
@@ -214,7 +253,6 @@ module.exports = Editor.Panel.define({
                     };
 
                     onMounted(async () => {
-                        // Load chat history
                         try {
                             const historyResult = await Editor.Message.request('cocos-ai-assistant', 'ai-chat-history');
                             if (historyResult && historyResult.success && historyResult.history) {
@@ -224,7 +262,6 @@ module.exports = Editor.Panel.define({
                             console.error('[AI Chat] Failed to load history:', e);
                         }
 
-                        // Check server status periodically
                         setInterval(async () => {
                             try {
                                 const status = await Editor.Message.request('cocos-ai-assistant', 'get-server-status');
@@ -238,8 +275,9 @@ module.exports = Editor.Panel.define({
                     });
 
                     return {
-                        messages, inputText, isLoading, statusText,
-                        serverRunning, quickPrompts, toolSteps,
+                        messages, displayMessages, inputText, isLoading,
+                        progressPhase, progressDetail, completedSteps, totalSteps, progressPercent,
+                        serverRunning, quickPrompts,
                         sendMessage, useQuickPrompt, clearChat,
                         stopGeneration, handleKeyDown,
                         formatMessage,

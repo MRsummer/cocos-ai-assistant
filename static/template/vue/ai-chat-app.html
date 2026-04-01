@@ -34,39 +34,34 @@
       </div>
     </div>
 
-    <!-- Message list -->
+    <!-- Message list (only user + assistant text, no tool messages) -->
     <div
-      v-for="(msg, index) in messages"
+      v-for="(msg, index) in displayMessages"
       :key="index"
       class="message"
-      :class="[msg.role, msg.type || '']"
+      :class="[msg.role]"
     >
       <div class="message-avatar">
         <span v-if="msg.role === 'user'">👤</span>
-        <span v-else-if="msg.role === 'system'">⚙️</span>
         <span v-else>🤖</span>
       </div>
       <div class="message-content">
-        <div v-if="msg.type === 'tool'" class="tool-badge">{{ msg.content }}</div>
-        <div v-else v-html="formatMessage(msg.content)"></div>
+        <div v-html="formatMessage(msg.content)"></div>
       </div>
     </div>
 
-    <!-- Loading indicator with live status -->
-    <div v-if="isLoading" class="message assistant loading">
+    <!-- Progress card (shown during AI work) -->
+    <div v-if="isLoading" class="message assistant">
       <div class="message-avatar"><span>🤖</span></div>
-      <div class="message-content">
-        <div class="typing-indicator">
-          <span class="status-label">{{ statusText }}</span>
-          <div class="dots"><span></span><span></span><span></span></div>
+      <div class="message-content progress-card">
+        <div class="progress-header">
+          <span class="progress-phase">{{ progressPhase }}</span>
+          <div class="progress-dots"><span></span><span></span><span></span></div>
         </div>
-        <!-- Live tool execution steps -->
-        <div v-if="toolSteps.length > 0" class="tool-steps">
-          <div v-for="(step, i) in toolSteps" :key="i" class="tool-step">
-            <span class="tool-step-status">{{ step.status }}</span>
-            <span class="tool-step-name">{{ step.name }}</span>
-            <span class="tool-step-time">{{ step.time }}</span>
-          </div>
+        <div class="progress-status">{{ progressDetail }}</div>
+        <div v-if="completedSteps > 0" class="progress-bar-container">
+          <div class="progress-bar" :style="{ width: progressPercent + '%' }"></div>
+          <span class="progress-count">{{ completedSteps }} 步完成</span>
         </div>
       </div>
     </div>
