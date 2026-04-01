@@ -24,24 +24,26 @@ module.exports = Editor.Panel.define({
                     const isLoading = ref(false);
                     const serverRunning = ref(false);
 
-                    // Progress tracking (replaces individual tool messages)
-                    const progressPhase = ref('🧠 AI 正在思考...');
+                    // Plan steps tracking
+                    interface PlanStep {
+                        text: string;
+                        status: 'pending' | 'running' | 'done' | 'error';
+                    }
+                    const planSteps = ref<PlanStep[]>([]);
                     const progressDetail = ref('');
-                    const completedSteps = ref(0);
-                    const totalSteps = ref(0);
+                    const progressPhase = ref('');
 
-                    const progressPercent = computed(() => {
-                        if (totalSteps.value <= 0) return 0;
-                        return Math.min(100, Math.round((completedSteps.value / totalSteps.value) * 100));
-                    });
-
-                    // Filtered messages: only user + assistant text (no tool/system noise)
+                    // Only show user messages + assistant final messages (no intermediate tool noise)
                     const displayMessages = computed(() => {
-                        return messages.value.filter(m => m.role === 'user' || (m.role === 'assistant' && m.type !== 'tool'));
+                        return messages.value.filter(m =>
+                            m.role === 'user' ||
+                            (m.role === 'assistant' && m.type !== 'tool' && m.type !== 'intermediate')
+                        );
                     });
 
                     let lastProcessedIndex = 0;
                     let statusPollTimer: any = null;
+                    let currentStepIndex = -1;
 
                     const quickPrompts = [
                         { icon: '🐦', label: 'Flappy Bird', prompt: '帮我创建一个完整的 Flappy Bird 游戏' },
@@ -50,11 +52,39 @@ module.exports = Editor.Panel.define({
                         { icon: '🚀', label: '自定义游戏', prompt: '' },
                     ];
 
-                    // ─── Poll for AI status updates (simplified) ───
+                    // ─── Parse plan steps from AI text ───
+                    const parsePlanFromText = (text: string) => {
+                        // Match patterns like "1. xxx" or "步骤1: xxx" or "第一步：xxx"
+                        const lines = text.split('\n');
+                        const steps: PlanStep[] = [];
+
+                        for (const line of lines) {
+                            const trimmed = line.trim();
+                            // Match: "1. text", "1) text", "步骤1: text", "Step 1: text"
+                            const match = trimmed.match(/^(?:(?:步骤|第|Step\s*)?(\d+)[.):：、]?\s*[:：]?\s*)(.+)/i)
+                                || trimmed.match(/^[-*]\s+(.+)/);
+                            if (match) {
+                                const stepText = match[match.length - 1].replace(/\*\*/g, '').trim();
+                                if (stepText.length > 2 && stepText.length < 100) {
+                                    steps.push({ text: stepText, status: 'pending' });
+                                }
+                            }
+                        }
+
+                        // Only use as plan if we got 2+ steps
+                        if (steps.length >= 2) {
+                            planSteps.value = steps;
+                            currentStepIndex = -1;
+                        }
+                    };
+
+                    // ─── Poll for AI status updates ───
                     const startStatusPolling = () => {
                         lastProcessedIndex = 0;
-                        completedSteps.value = 0;
-                        totalSteps.value = 0;
+                        currentStepIndex = -1;
+                        planSteps.value = [];
+                        progressDetail.value = '';
+                        progressPhase.value = '🧠 AI 正在规划...';
                         stopStatusPolling();
 
                         statusPollTimer = setInterval(async () => {
@@ -64,21 +94,14 @@ module.exports = Editor.Panel.define({
 
                                 const history = result.history as any[];
 
-                                // Count completed steps
                                 for (let i = lastProcessedIndex; i < history.length; i++) {
                                     const status = history[i];
-                                    if (status.type === 'tool_call') {
-                                        totalSteps.value++;
-                                    }
-                                    if (status.type === 'tool_result') {
-                                        completedSteps.value++;
-                                    }
+                                    processStatus(status);
                                 }
                                 lastProcessedIndex = history.length;
 
-                                // Update progress display from current status
                                 if (result.current) {
-                                    updateProgress(result.current);
+                                    updateCurrentStatus(result.current);
                                 }
                             } catch {
                                 // Ignore polling errors
@@ -93,29 +116,72 @@ module.exports = Editor.Panel.define({
                         }
                     };
 
-                    const updateProgress = (status: any) => {
+                    const processStatus = (status: any) => {
+                        if (status.type === 'text' && status.message) {
+                            // Try to parse plan from first text output
+                            if (planSteps.value.length === 0) {
+                                parsePlanFromText(status.message);
+                            }
+                        }
+
+                        if (status.type === 'tool_call') {
+                            // Advance to next step if we have a plan
+                            if (planSteps.value.length > 0) {
+                                // Mark current step as done
+                                if (currentStepIndex >= 0 && currentStepIndex < planSteps.value.length) {
+                                    // Don't mark done until tool_result
+                                }
+                                // Find next pending step or advance current
+                                if (currentStepIndex < 0 || (currentStepIndex < planSteps.value.length &&
+                                    planSteps.value[currentStepIndex].status === 'done')) {
+                                    currentStepIndex++;
+                                    if (currentStepIndex < planSteps.value.length) {
+                                        planSteps.value[currentStepIndex].status = 'running';
+                                    }
+                                } else if (currentStepIndex >= 0 && currentStepIndex < planSteps.value.length &&
+                                    planSteps.value[currentStepIndex].status === 'pending') {
+                                    planSteps.value[currentStepIndex].status = 'running';
+                                }
+                            }
+                            progressPhase.value = '⚙️ 正在构建';
+                        }
+
+                        if (status.type === 'tool_result') {
+                            // Mark current step as done on successful tool results
+                            if (planSteps.value.length > 0 && currentStepIndex >= 0 && currentStepIndex < planSteps.value.length) {
+                                planSteps.value[currentStepIndex].status = status.data?.isError ? 'error' : 'done';
+                            }
+                        }
+                    };
+
+                    const updateCurrentStatus = (status: any) => {
                         switch (status.type) {
                             case 'thinking':
-                                progressPhase.value = '🧠 AI 正在思考...';
+                                progressPhase.value = planSteps.value.length > 0 ? '🧠 AI 正在思考下一步...' : '🧠 AI 正在规划...';
                                 progressDetail.value = '';
                                 break;
                             case 'tool_call':
-                                progressPhase.value = '⚙️ 正在构建游戏';
-                                // Show friendly tool name
-                                progressDetail.value = friendlyToolName(status.data?.name || status.message);
+                                progressPhase.value = '⚙️ 正在执行';
+                                progressDetail.value = friendlyToolName(status.data?.name || '');
                                 break;
-                            case 'tool_result':
-                                // Keep current phase, just update detail
+                            case 'tool_result': {
                                 const icon = status.data?.isError ? '❌' : '✅';
-                                progressDetail.value = `${icon} ${friendlyToolName(status.data?.name || status.message)}`;
+                                progressDetail.value = `${icon} ${friendlyToolName(status.data?.name || '')}`;
                                 break;
+                            }
                             case 'text':
                                 progressPhase.value = '💬 AI 正在总结...';
                                 progressDetail.value = '';
                                 break;
                             case 'done':
-                                progressPhase.value = '✅ 完成';
+                                progressPhase.value = '✅ 全部完成';
                                 progressDetail.value = '';
+                                // Mark all remaining steps as done
+                                for (const step of planSteps.value) {
+                                    if (step.status === 'pending' || step.status === 'running') {
+                                        step.status = 'done';
+                                    }
+                                }
                                 break;
                             case 'error':
                                 progressPhase.value = '❌ 出错了';
@@ -124,7 +190,6 @@ module.exports = Editor.Panel.define({
                         }
                     };
 
-                    // Map internal tool names to friendly Chinese descriptions
                     const friendlyToolName = (name: string): string => {
                         if (!name) return '';
                         const map: Record<string, string> = {
@@ -151,13 +216,10 @@ module.exports = Editor.Panel.define({
                             'project_create_directory': '创建目录',
                             'project_reimport_asset': '重新导入资源',
                         };
-                        // Check exact match first
                         if (map[name]) return map[name];
-                        // Try partial match
                         for (const [key, val] of Object.entries(map)) {
                             if (name.includes(key)) return val;
                         }
-                        // Fallback: clean up the name
                         return name.replace(/_/g, ' ').replace(/^正在执行:\s*/, '');
                     };
 
@@ -168,7 +230,8 @@ module.exports = Editor.Panel.define({
                         messages.value.push({ role: 'user', content: text });
                         inputText.value = '';
                         isLoading.value = true;
-                        progressPhase.value = '🧠 AI 正在思考...';
+                        planSteps.value = [];
+                        progressPhase.value = '🧠 AI 正在规划...';
                         progressDetail.value = '';
 
                         await nextTick();
@@ -179,6 +242,7 @@ module.exports = Editor.Panel.define({
                         try {
                             const result = await Editor.Message.request('cocos-ai-assistant', 'ai-chat', text);
                             if (result && result.success) {
+                                // Only add final summary if it's meaningful
                                 if (result.result) {
                                     messages.value.push({ role: 'assistant', content: result.result });
                                 }
@@ -198,17 +262,12 @@ module.exports = Editor.Panel.define({
                         stopStatusPolling();
 
                         isLoading.value = false;
-                        progressPhase.value = '';
-                        progressDetail.value = '';
-                        completedSteps.value = 0;
-                        totalSteps.value = 0;
                         await nextTick();
                         scrollToBottom();
                     };
 
                     const useQuickPrompt = (prompt: string) => {
                         if (!prompt) {
-                            // "自定义游戏" — just focus the input
                             const textarea = document.querySelector('.input-wrapper textarea') as HTMLTextAreaElement;
                             if (textarea) textarea.focus();
                             return;
@@ -220,14 +279,13 @@ module.exports = Editor.Panel.define({
                     const clearChat = async () => {
                         await Editor.Message.request('cocos-ai-assistant', 'ai-chat-clear');
                         messages.value = [];
+                        planSteps.value = [];
                     };
 
                     const stopGeneration = async () => {
                         await Editor.Message.request('cocos-ai-assistant', 'ai-chat-stop');
                         stopStatusPolling();
                         isLoading.value = false;
-                        progressPhase.value = '';
-                        progressDetail.value = '';
                     };
 
                     const scrollToBottom = () => {
@@ -276,7 +334,7 @@ module.exports = Editor.Panel.define({
 
                     return {
                         messages, displayMessages, inputText, isLoading,
-                        progressPhase, progressDetail, completedSteps, totalSteps, progressPercent,
+                        planSteps, progressPhase, progressDetail,
                         serverRunning, quickPrompts,
                         sendMessage, useQuickPrompt, clearChat,
                         stopGeneration, handleKeyDown,

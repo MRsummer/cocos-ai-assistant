@@ -113,38 +113,23 @@ export class AIChatEngine {
 
 ### 创建新游戏时：
 
-**第一步：输出完整游戏方案**（不执行任何工具）
-收到"创建XX游戏"的需求后，先输出方案让用户确认：
-\`\`\`
-【游戏方案】
-🎮 游戏名：XXX
-🎯 核心玩法：一句话描述
-📁 脚本清单：
-  - GameManager.ts — 游戏状态机（开始/进行/结束）、分数管理
-  - Player.ts — 玩家控制、物理/移动逻辑
-  - XXX.ts — ...
-🌲 场景结构：
-  Canvas
-  ├── Background
-  ├── GameLayer
-  │   ├── Player
-  │   └── ...
-  ├── UILayer
-  │   ├── ScoreLabel
-  │   ├── StartPanel
-  │   └── GameOverPanel
-  └── ...
-⚡ 关键机制：碰撞检测方式、滚动方式、难度递增等
-\`\`\`
+**⚠️ 必须先输出执行计划，再开始操作。绝对不要跳过计划直接调用工具。**
 
-**第二步：批量创建所有脚本**
-用户确认后（或不需要确认时），按顺序一次性创建所有脚本。**每个脚本必须是完整的、可运行的代码**，不留 TODO 或占位符。
+收到需求后，第一条回复必须是编号步骤计划，格式如下：
 
-**第三步：搭建场景**
-创建所有节点、添加组件、设置属性。
+1. 创建脚本目录
+2. 创建 GameManager.ts — 游戏状态机和分数管理
+3. 创建 Player.ts — 玩家控制逻辑
+4. 创建 XXX.ts — ...
+5. 搭建场景节点结构（Canvas/GameLayer/UILayer）
+6. 为节点添加组件和属性
+7. 保存场景并验证
 
-**第四步：验证并总结**
-检查场景结构完整性，输出操作指南（如何运行、按键说明等）。
+要求：
+- 计划必须是简洁的编号列表（1. 2. 3. ...），每步一行
+- 计划输出后，**立即开始按顺序执行**，不需要等用户确认
+- 每个脚本必须是完整的、可运行的代码，不留 TODO 或占位符
+- 全部完成后输出简短的操作指南（按键说明等）
 
 ### 修改现有游戏时：
 1. **先读后改**：必须先用 \`read_asset\` 读取当前完整内容
@@ -396,6 +381,7 @@ ${COCOS_REFERENCE}`;
         // AI conversation loop - handle tool_use / tool_result cycles
         let maxIterations = 50; // Safety limit
         let finalText = '';
+        let lastTextBlock = ''; // Track only the last text for final display
 
         while (maxIterations > 0) {
             maxIterations--;
@@ -419,10 +405,11 @@ ${COCOS_REFERENCE}`;
             const textBlocks = assistantContent.filter(b => b.type === 'text');
             const toolUseBlocks = assistantContent.filter(b => b.type === 'tool_use');
 
-            // Emit text blocks
+            // Emit text blocks (for plan parsing in frontend)
             for (const block of textBlocks) {
                 if (block.text) {
                     finalText += block.text + '\n';
+                    lastTextBlock = block.text;
                     onStatus?.({ type: 'text', message: block.text });
                 }
             }
@@ -501,10 +488,12 @@ ${COCOS_REFERENCE}`;
         if (maxIterations <= 0) {
             const msg = '⚠️ 达到最大执行轮次限制，已停止';
             onStatus?.({ type: 'error', message: msg });
-            finalText += '\n' + msg;
+            lastTextBlock = msg;
         }
 
-        return finalText.trim();
+        // Only return the last text block (final summary) to avoid duplication
+        // The intermediate plan/text was already sent via onStatus for progress display
+        return lastTextBlock.trim();
     }
 
     /**
