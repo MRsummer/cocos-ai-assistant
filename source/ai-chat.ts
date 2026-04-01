@@ -186,6 +186,11 @@ export class ClassName extends Component {
 5. **碰撞/交互**：核心游戏逻辑的碰撞或判定
 6. **难度递进**（如适用）：随时间或分数增加难度
 
+## ⛔ 组件冲突规则（必须遵守）
+- **同一节点不能同时有 Sprite 和 Graphics**（都继承自 Renderable2D）
+- 需要同时显示图片和自定义绘制时，用父子节点分开放
+- 同一节点不能有两个相同类型的渲染组件（Sprite、Label、Graphics、RichText 等互斥）
+
 ## Cocos Creator 开发要点
 - 节点操作用 \`this.node\`，设置位置用 \`this.node.setPosition(x, y, z)\`
 - 获取组件用 \`this.getComponent(ComponentClass)\`
